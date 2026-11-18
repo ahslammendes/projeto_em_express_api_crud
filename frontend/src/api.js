@@ -23,6 +23,10 @@ export async function listarNotas() {
   return dados;
 }
 
+export function obterNota(id) {
+  return fetch(`${API_URL}/${id}`).then(tratarResposta);
+}
+
 export function criarNota(nota) {
   return fetch(API_URL, {
     method: 'POST',
