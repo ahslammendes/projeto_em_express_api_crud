@@ -1,7 +1,10 @@
 // Passo 9: depois do deploy no Render, troque a URL abaixo pelo endpoint online,
 // ex.: 'https://sua-api.onrender.com/api/notes'
 // (ou defina a variável de ambiente VITE_API_URL na Vercel, sem mexer no código).
-const API_URL = import.meta.env.VITE_API_URL || 'https://projeto-em-express-api-crud.onrender.com/api/notes';
+const URL_BASE = import.meta.env.VITE_API_URL || 'https://projeto-em-express-api-crud.onrender.com/api/notes';
+
+// Garante que a URL termine em /api/notes, mesmo que seja informada só a raiz da API
+const API_URL = URL_BASE.replace(/\/+$/, '').replace(/(\/api\/notes)?$/, '/api/notes');
 
 async function tratarResposta(res) {
   if (res.status === 204) return null;
@@ -12,8 +15,12 @@ async function tratarResposta(res) {
 
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
-export function listarNotas() {
-  return fetch(API_URL).then(tratarResposta);
+export async function listarNotas() {
+  const dados = await fetch(API_URL).then(tratarResposta);
+  if (!Array.isArray(dados)) {
+    throw new Error(`Resposta inesperada da API (${API_URL}).`);
+  }
+  return dados;
 }
 
 export function criarNota(nota) {

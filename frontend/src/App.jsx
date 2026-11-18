@@ -19,6 +19,7 @@ export default function App() {
       setErro('');
       setNotas(await listarNotas());
     } catch (e) {
+      setNotas([]);
       setErro('Não foi possível carregar as notas. ' + e.message);
     } finally {
       setCarregando(false);
