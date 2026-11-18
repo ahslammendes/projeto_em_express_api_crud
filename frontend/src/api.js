@@ -1,7 +1,7 @@
 // Passo 9: depois do deploy no Render, troque a URL abaixo pelo endpoint online,
 // ex.: 'https://sua-api.onrender.com/api/notes'
 // (ou defina a variável de ambiente VITE_API_URL na Vercel, sem mexer no código).
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/notes';
+const API_URL = import.meta.env.VITE_API_URL || 'https://projeto-em-express-api-crud.onrender.com/api/notes';
 
 async function tratarResposta(res) {
   if (res.status === 204) return null;
