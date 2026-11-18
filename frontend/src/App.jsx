@@ -375,8 +375,7 @@ export default function App() {
         <section className="intro">
           <h1 className="titulo-pagina">Minhas notas</h1>
           <p className="subtitulo">
-            Um cantinho para guardar ideias, lembretes e tarefas — salvo direto no{' '}
-            <code>data.json</code> da API.
+            Um cantinho para guardar ideias, lembretes e tarefas.
           </p>
         </section>
 
@@ -451,7 +450,6 @@ export default function App() {
 
       <footer className="rodape">
         <Tracejado />
-        <p>Notas · CRUD com Express.js + React</p>
       </footer>
 
       <Dialogo
