@@ -305,7 +305,21 @@ a {
 .contador {
   padding: 0 0.375rem;
   border-radius: 999px;
+  background: var(--ink-10);
+}
+
+.pilula-ativa .contador {
   background: color-mix(in oklab, var(--color-paper) 20%, transparent);
+}
+
+.pilula-criar {
+  border: 1px dashed var(--ink-30);
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.pilula-criar:hover {
+  border-style: solid;
 }
 
 .bolinha {
@@ -643,10 +657,68 @@ a {
 .folha {
   transform: rotate(-0.5deg);
   filter: drop-shadow(var(--shadow-raised));
+  transition: background-color 0.2s var(--ease-out);
 }
 
 .folha .nota-interna {
   min-height: 0;
+}
+
+.form-dialogo {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.seletores {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.seletor-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.seletor-titulo {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-muted);
+}
+
+.seletor-opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.seletor-cores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.amostra-cor {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  border: 1.5px solid #0006;
+  transition: transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+}
+
+.amostra-cor:hover {
+  transform: scale(1.12);
+}
+
+.amostra-cor.ativa {
+  border-color: var(--color-ink);
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-ink);
+  transform: scale(1.1);
 }
 
 .campo {

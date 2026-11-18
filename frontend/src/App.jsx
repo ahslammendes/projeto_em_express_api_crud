@@ -7,25 +7,79 @@ import {
   excluirNota,
 } from './api.js';
 
-// Paleta de cores das notas (vinda do design system)
-const PALETA = [
-  '#FAE680', '#9EAAFA', '#A2CBAF', '#E8ADB1', '#A6C2EB',
-  '#F4E8C8', '#CCA7ED', '#F29874', '#6C95CF', '#F4DAA0',
+// Paleta de cores das notas (vinda do design system iamrob.in/notes)
+const CORES = [
+  { hex: '#FAE680', nome: 'Amarelo' },
+  { hex: '#9EAAFA', nome: 'Lavanda' },
+  { hex: '#A2CBAF', nome: 'Sálvia' },
+  { hex: '#E8ADB1', nome: 'Rosa' },
+  { hex: '#A6C2EB', nome: 'Céu' },
+  { hex: '#F4E8C8', nome: 'Creme' },
+  { hex: '#CCA7ED', nome: 'Lilás' },
+  { hex: '#F29874', nome: 'Coral' },
+  { hex: '#6C95CF', nome: 'Azul' },
+  { hex: '#F4DAA0', nome: 'Pêssego' },
 ];
-const ROTACOES = [0, -1, 1, -0.5, 0.5];
-const formVazio = { titulo: '', texto: '' };
 
-// Gera sempre a mesma cor/inclinação para a mesma nota, a partir do ID
+const CATEGORIAS = [
+  { id: 'Nota', corPadrao: '#FAE680' },
+  { id: 'Lembrete', corPadrao: '#A2CBAF' },
+  { id: 'Tarefa', corPadrao: '#9EAAFA' },
+  { id: 'Ideia', corPadrao: '#CCA7ED' },
+  { id: 'Projeto', corPadrao: '#F29874' },
+];
+
+const PALETA = CORES.map((c) => c.hex);
+const ROTACOES = [0, -1, 1, -0.5, 0.5];
+const STORAGE_KEY = 'notas_custom_meta_v1';
+
+const formVazio = {
+  titulo: '',
+  texto: '',
+  categoria: 'Nota',
+  cor: CORES[0].hex,
+};
+
+function lerMetadadosLocais() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function salvarMetadadoLocal(id, { categoria, cor }) {
+  try {
+    const atual = lerMetadadosLocais();
+    atual[id] = { categoria, cor };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(atual));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+// Gera sempre a mesma cor/inclinação padrão a partir do ID quando a nota ainda não tem cor definida
 function hash(texto) {
   let h = 0;
   for (const c of String(texto)) h = (h * 31 + c.charCodeAt(0)) | 0;
   return Math.abs(h);
 }
 
-function visualDaNota(id) {
-  const h = hash(id);
+function enriquecerNota(nota) {
+  const locais = lerMetadadosLocais()[nota.id] || {};
+  const h = hash(nota.id);
   return {
-    cor: PALETA[h % PALETA.length],
+    ...nota,
+    categoria: nota.categoria || locais.categoria || 'Nota',
+    cor: nota.cor || locais.cor || PALETA[h % PALETA.length],
+  };
+}
+
+function visualDaNota(nota) {
+  const h = hash(nota.id);
+  return {
+    cor: nota.cor || PALETA[h % PALETA.length],
+    categoria: nota.categoria || 'Nota',
     rotacao: ROTACOES[h % ROTACOES.length],
     x: (h % 5) - 1,
     y: (h % 7) + 1,
@@ -62,7 +116,7 @@ function DefsAnalog() {
 // Cartão de nota
 // ---------------------------------------------------------------------------
 function CartaoNota({ nota, onAbrir }) {
-  const v = visualDaNota(nota.id);
+  const v = visualDaNota(nota);
   return (
     <li
       className="nota-wrap"
@@ -74,11 +128,11 @@ function CartaoNota({ nota, onAbrir }) {
           className="nota grao hover-lift"
           style={{ backgroundColor: v.cor }}
           onClick={() => onAbrir(nota)}
-          aria-label={`Abrir nota ${nota.titulo}`}
+          aria-label={`Abrir ${v.categoria} ${nota.titulo}`}
         >
           <div className="nota-interna analog">
             <div>
-              <span className="etiqueta">Nota</span>
+              <span className="etiqueta">{v.categoria}</span>
               <h3 className="nota-titulo">{nota.titulo}</h3>
             </div>
             <Tracejado />
@@ -112,8 +166,12 @@ function Dialogo({ estado, onFechar, onSalvar, onExcluir, onTrocarModo }) {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
 
-  const { modo, nota } = estado || {};
-  const cor = nota ? visualDaNota(nota.id).cor : PALETA[0];
+  const { modo, nota, categoriaInicial } = estado || {};
+  const visualAtual = nota ? visualDaNota(nota) : null;
+  const corFolha =
+    modo === 'criar' || modo === 'editar'
+      ? form.cor
+      : visualAtual?.cor || CORES[0].hex;
 
   useEffect(() => {
     const dialog = ref.current;
@@ -125,9 +183,32 @@ function Dialogo({ estado, onFechar, onSalvar, onExcluir, onTrocarModo }) {
   useEffect(() => {
     setErro('');
     setEnviando(false);
-    if (modo === 'editar' && nota) setForm({ titulo: nota.titulo, texto: nota.texto });
-    if (modo === 'criar') setForm(formVazio);
-  }, [modo, nota]);
+    if (modo === 'editar' && nota) {
+      const v = visualDaNota(nota);
+      setForm({
+        titulo: nota.titulo,
+        texto: nota.texto,
+        categoria: v.categoria,
+        cor: v.cor,
+      });
+    }
+    if (modo === 'criar') {
+      const cat = CATEGORIAS.find((c) => c.id === categoriaInicial) || CATEGORIAS[0];
+      setForm({
+        ...formVazio,
+        categoria: cat.id,
+        cor: cat.corPadrao,
+      });
+    }
+  }, [modo, nota, categoriaInicial]);
+
+  function selecionarCategoria(cat) {
+    setForm((atual) => ({
+      ...atual,
+      categoria: cat.id,
+      cor: cat.corPadrao || atual.cor,
+    }));
+  }
 
   async function salvar(e) {
     e.preventDefault();
@@ -165,10 +246,10 @@ function Dialogo({ estado, onFechar, onSalvar, onExcluir, onTrocarModo }) {
         <div className="dialogo-painel">
           <div className="dialogo-topo">
             <h2 className="rotulo">
-              {modo === 'ver' && 'Nota'}
-              {modo === 'criar' && 'Nova nota'}
-              {modo === 'editar' && 'Editar nota'}
-              {modo === 'excluir' && 'Excluir nota'}
+              {modo === 'ver' && (visualAtual?.categoria || 'Nota')}
+              {modo === 'criar' && `Criar ${form.categoria.toLowerCase()}`}
+              {modo === 'editar' && `Editar ${form.categoria.toLowerCase()}`}
+              {modo === 'excluir' && `Excluir ${visualAtual?.categoria?.toLowerCase() || 'nota'}`}
             </h2>
             <button type="button" className="botao-icone" onClick={onFechar} aria-label="Fechar">
               ✕
@@ -178,10 +259,10 @@ function Dialogo({ estado, onFechar, onSalvar, onExcluir, onTrocarModo }) {
           {/* ---------- Ver ---------- */}
           {modo === 'ver' && (
             <>
-              <div className="nota grao folha" style={{ backgroundColor: cor }}>
+              <div className="nota grao folha" style={{ backgroundColor: corFolha }}>
                 <div className="nota-interna analog">
                   <div>
-                    <span className="etiqueta">Nota #{nota.id}</span>
+                    <span className="etiqueta">{visualAtual?.categoria || 'Nota'}</span>
                     <h3 className="nota-titulo grande">{nota.titulo}</h3>
                   </div>
                   <Tracejado />
@@ -218,20 +299,60 @@ function Dialogo({ estado, onFechar, onSalvar, onExcluir, onTrocarModo }) {
 
           {/* ---------- Criar / Editar ---------- */}
           {(modo === 'criar' || modo === 'editar') && (
-            <form onSubmit={salvar}>
-              <div className="nota grao folha" style={{ backgroundColor: cor }}>
+            <form onSubmit={salvar} className="form-dialogo">
+              <div className="seletores">
+                <div className="seletor-bloco">
+                  <span className="seletor-titulo">Tipo</span>
+                  <div className="seletor-opcoes" role="radiogroup" aria-label="Tipo da nota">
+                    {CATEGORIAS.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        className={`pilula ${form.categoria === cat.id ? 'pilula-ativa' : ''}`}
+                        onClick={() => selecionarCategoria(cat)}
+                      >
+                        <span className="bolinha" style={{ backgroundColor: cat.corPadrao }} />
+                        {cat.id}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="seletor-bloco">
+                  <span className="seletor-titulo">Cor do papel</span>
+                  <div className="seletor-cores" role="radiogroup" aria-label="Cor da nota">
+                    {CORES.map((c) => (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        className={`amostra-cor ${form.cor === c.hex ? 'ativa' : ''}`}
+                        style={{ backgroundColor: c.hex }}
+                        onClick={() => setForm({ ...form, cor: c.hex })}
+                        title={c.nome}
+                        aria-label={c.nome}
+                        aria-pressed={form.cor === c.hex}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="nota grao folha" style={{ backgroundColor: corFolha }}>
                 <div className="nota-interna">
-                  <label className="campo">
-                    <span className="etiqueta">Título</span>
-                    <input
-                      className="input-titulo"
-                      value={form.titulo}
-                      onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-                      placeholder="Dê um título..."
-                      maxLength={120}
-                      autoFocus
-                    />
-                  </label>
+                  <div>
+                    <span className="etiqueta">{form.categoria}</span>
+                    <label className="campo">
+                      <span className="sr-only">Título</span>
+                      <input
+                        className="input-titulo"
+                        value={form.titulo}
+                        onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+                        placeholder="Dê um título..."
+                        maxLength={120}
+                        autoFocus
+                      />
+                    </label>
+                  </div>
                   <Tracejado />
                   <label className="campo">
                     <span className="sr-only">Texto</span>
@@ -239,20 +360,26 @@ function Dialogo({ estado, onFechar, onSalvar, onExcluir, onTrocarModo }) {
                       className="manuscrito input-texto"
                       value={form.texto}
                       onChange={(e) => setForm({ ...form, texto: e.target.value })}
-                      placeholder="escreva aqui sua nota..."
-                      rows={6}
+                      placeholder="escreva aqui..."
+                      rows={5}
                     />
                   </label>
                   <Tracejado />
                 </div>
               </div>
+
               {erro && <p className="aviso-erro">{erro}</p>}
+
               <div className="acoes">
                 <button type="button" className="pilula" onClick={onFechar}>
                   Cancelar
                 </button>
                 <button type="submit" className="pilula pilula-ativa" disabled={enviando}>
-                  {enviando ? 'Salvando...' : modo === 'criar' ? 'Criar nota' : 'Salvar'}
+                  {enviando
+                    ? 'Salvando...'
+                    : modo === 'criar'
+                    ? `Criar ${form.categoria.toLowerCase()}`
+                    : 'Salvar'}
                 </button>
               </div>
             </form>
@@ -295,12 +422,14 @@ export default function App() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   const [busca, setBusca] = useState('');
-  const [dialogo, setDialogo] = useState(null); // { modo, nota }
+  const [filtroCategoria, setFiltroCategoria] = useState('Todas');
+  const [dialogo, setDialogo] = useState(null); // { modo, nota, categoriaInicial }
 
   async function carregar() {
     try {
       setErro('');
-      setNotas(await listarNotas());
+      const lista = await listarNotas();
+      setNotas(lista.map(enriquecerNota));
     } catch (e) {
       setNotas([]);
       setErro(e.message);
@@ -313,23 +442,38 @@ export default function App() {
     carregar();
   }, []);
 
+  const contagens = useMemo(() => {
+    const mapa = { Todas: notas.length };
+    for (const cat of CATEGORIAS) mapa[cat.id] = 0;
+    for (const n of notas) {
+      const c = n.categoria || 'Nota';
+      mapa[c] = (mapa[c] || 0) + 1;
+    }
+    return mapa;
+  }, [notas]);
+
   const notasFiltradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     const lista = [...notas].sort((a, b) =>
       String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''))
     );
-    if (!termo) return lista;
-    return lista.filter(
-      (n) =>
-        n.titulo.toLowerCase().includes(termo) || n.texto.toLowerCase().includes(termo)
-    );
-  }, [notas, busca]);
+    return lista.filter((n) => {
+      const cat = n.categoria || 'Nota';
+      if (filtroCategoria !== 'Todas' && cat !== filtroCategoria) return false;
+      if (!termo) return true;
+      return (
+        n.titulo.toLowerCase().includes(termo) ||
+        n.texto.toLowerCase().includes(termo) ||
+        cat.toLowerCase().includes(termo)
+      );
+    });
+  }, [notas, busca, filtroCategoria]);
 
   // Abre a nota buscando a versão mais recente pela rota GET /api/notes/:id
   async function abrirNota(nota) {
     setDialogo({ modo: 'ver', nota });
     try {
-      const atual = await obterNota(nota.id);
+      const atual = enriquecerNota(await obterNota(nota.id));
       setDialogo((d) => (d && d.nota?.id === nota.id ? { ...d, nota: atual } : d));
     } catch (e) {
       setDialogo(null);
@@ -340,10 +484,18 @@ export default function App() {
 
   async function salvar(form) {
     if (dialogo.modo === 'criar') {
-      const nova = await criarNota(form);
+      const criada = await criarNota(form);
+      salvarMetadadoLocal(criada.id, { categoria: form.categoria, cor: form.cor });
+      const nova = enriquecerNota({ ...criada, categoria: form.categoria, cor: form.cor });
       setNotas((lista) => [...lista, nova]);
     } else {
-      const editada = await atualizarNota(dialogo.nota.id, form);
+      const atualizada = await atualizarNota(dialogo.nota.id, form);
+      salvarMetadadoLocal(atualizada.id, { categoria: form.categoria, cor: form.cor });
+      const editada = enriquecerNota({
+        ...atualizada,
+        categoria: form.categoria,
+        cor: form.cor,
+      });
       setNotas((lista) => lista.map((n) => (n.id === editada.id ? editada : n)));
     }
     setDialogo(null);
@@ -365,7 +517,11 @@ export default function App() {
         <a href="/" className="marca" aria-label="Início">
           notas<span className="marca-ponto">.</span>
         </a>
-        <span className={`status ${carregando ? 'status-carregando' : online ? 'status-on' : 'status-off'}`}>
+        <span
+          className={`status ${
+            carregando ? 'status-carregando' : online ? 'status-on' : 'status-off'
+          }`}
+        >
           <span className="status-ponto" />
           {carregando ? 'conectando' : online ? 'api online' : 'api offline'}
         </span>
@@ -379,17 +535,46 @@ export default function App() {
           </p>
         </section>
 
-        <nav className="barra" aria-label="Ações">
-          <span className="pilula pilula-ativa pilula-contador">
-            Todas<span className="contador">{notas.length}</span>
-          </span>
+        <nav className="barra" aria-label="Filtros e ações">
           <button
             type="button"
-            className="pilula"
-            onClick={() => setDialogo({ modo: 'criar', nota: null })}
+            className={`pilula pilula-contador ${
+              filtroCategoria === 'Todas' ? 'pilula-ativa' : ''
+            }`}
+            onClick={() => setFiltroCategoria('Todas')}
           >
-            <span className="bolinha" style={{ backgroundColor: PALETA[0] }} />+ Nova nota
+            Todas<span className="contador">{contagens.Todas}</span>
           </button>
+
+          {CATEGORIAS.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              className={`pilula pilula-contador ${
+                filtroCategoria === cat.id ? 'pilula-ativa' : ''
+              }`}
+              onClick={() => setFiltroCategoria(cat.id)}
+            >
+              <span className="bolinha" style={{ backgroundColor: cat.corPadrao }} />
+              {cat.id}
+              <span className="contador">{contagens[cat.id] || 0}</span>
+            </button>
+          ))}
+
+          <button
+            type="button"
+            className="pilula pilula-criar"
+            onClick={() =>
+              setDialogo({
+                modo: 'criar',
+                nota: null,
+                categoriaInicial: filtroCategoria === 'Todas' ? 'Nota' : filtroCategoria,
+              })
+            }
+          >
+            + Criar
+          </button>
+
           <label className="busca">
             <span className="sr-only">Buscar</span>
             <input
@@ -427,17 +612,23 @@ export default function App() {
         ) : notasFiltradas.length === 0 && !erro ? (
           <div className="vazio">
             <p className="manuscrito">
-              {busca ? 'nenhuma nota encontrada...' : 'nenhuma nota por aqui ainda...'}
+              {busca || filtroCategoria !== 'Todas'
+                ? 'nenhum item encontrado para esse filtro...'
+                : 'nenhuma nota por aqui ainda...'}
             </p>
-            {!busca && (
-              <button
-                type="button"
-                className="pilula pilula-ativa"
-                onClick={() => setDialogo({ modo: 'criar', nota: null })}
-              >
-                Criar a primeira nota
-              </button>
-            )}
+            <button
+              type="button"
+              className="pilula pilula-ativa"
+              onClick={() =>
+                setDialogo({
+                  modo: 'criar',
+                  nota: null,
+                  categoriaInicial: filtroCategoria === 'Todas' ? 'Nota' : filtroCategoria,
+                })
+              }
+            >
+              + Criar {filtroCategoria === 'Todas' ? 'nota' : filtroCategoria.toLowerCase()}
+            </button>
           </div>
         ) : (
           <ul className="grade">

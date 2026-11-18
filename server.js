@@ -34,14 +34,21 @@ async function salvarNotas(notas) {
   await fs.writeFile(DATA_FILE, JSON.stringify(notas, null, 2), 'utf-8');
 }
 
-// Valida se titulo e texto foram enviados (strings não vazias)
+// Valida se titulo e texto foram enviados (strings não vazias) e preserva categoria e cor opcionais
 function validarNota(body) {
-  const { titulo, texto } = body || {};
+  const { titulo, texto, categoria, cor } = body || {};
   if (typeof titulo !== 'string' || !titulo.trim() ||
       typeof texto !== 'string' || !texto.trim()) {
     return null;
   }
-  return { titulo: titulo.trim(), texto: texto.trim() };
+  const resultado = { titulo: titulo.trim(), texto: texto.trim() };
+  if (typeof categoria === 'string' && categoria.trim()) {
+    resultado.categoria = categoria.trim();
+  }
+  if (typeof cor === 'string' && cor.trim()) {
+    resultado.cor = cor.trim();
+  }
+  return resultado;
 }
 
 // ------------------------------- Rotas CRUD --------------------------------
@@ -64,6 +71,8 @@ app.post('/api/notes', async (req, res) => {
     id: Date.now().toString(),
     titulo: dados.titulo,
     texto: dados.texto,
+    ...(dados.categoria && { categoria: dados.categoria }),
+    ...(dados.cor && { cor: dados.cor }),
     criadoEm: new Date().toISOString(),
   };
 
@@ -99,6 +108,8 @@ app.put('/api/notes/:id', async (req, res) => {
     ...notas[indice],
     titulo: dados.titulo,
     texto: dados.texto,
+    ...(dados.categoria && { categoria: dados.categoria }),
+    ...(dados.cor && { cor: dados.cor }),
     atualizadoEm: new Date().toISOString(),
   };
 
